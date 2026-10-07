@@ -2,18 +2,7 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 
-# -----------------------------
-# Load Environment Variables
-# -----------------------------
 load_dotenv()
-
-api_key = os.getenv("GROQ_API_KEY")
-
-if not api_key:
-    print("❌ GROQ_API_KEY not found in .env file")
-    exit()
-
-client = Groq(api_key=api_key)
 
 
 # -----------------------------
@@ -31,25 +20,43 @@ def banner():
 # User Input
 # -----------------------------
 def get_user_input():
+    subjects = {"1": "Physics", "2": "Chemistry", "3": "Mathematics"}
+    modes = {
+        "1": "Concept Explanation",
+        "2": "Formula Revision",
+        "3": "MCQ Practice",
+        "4": "Quick Revision",
+    }
 
     print("Subjects Available:")
-    print("1. Physics")
-    print("2. Chemistry")
-    print("3. Mathematics")
+    for number, subject_name in subjects.items():
+        print(f"{number}. {subject_name}")
     print()
 
-    subject = input("Enter Subject: ").strip()
-    topic = input("Enter Topic: ").strip()
+    while True:
+        subject_choice = input("Choose Subject (1-3): ").strip()
+        if subject_choice in subjects:
+            subject = subjects[subject_choice]
+            break
+        print("Please choose 1, 2, or 3.")
+
+    while True:
+        topic = input("Enter Topic: ").strip()
+        if topic:
+            break
+        print("Topic cannot be empty.")
 
     print()
     print("Study Modes:")
-    print("1. Concept Explanation")
-    print("2. Formula Revision")
-    print("3. MCQ Practice")
-    print("4. Quick Revision")
+    for number, mode_name in modes.items():
+        print(f"{number}. {mode_name}")
     print()
 
-    mode = input("Choose Mode (1-4): ").strip()
+    while True:
+        mode = input("Choose Mode (1-4): ").strip()
+        if mode in modes:
+            break
+        print("Please choose a mode from 1 to 4.")
 
     return subject, topic, mode
 
@@ -58,9 +65,7 @@ def get_user_input():
 # Prompt Builder
 # -----------------------------
 def build_prompt(subject, topic, mode):
-
     if mode == "1":
-
         return f"""
 You are an expert JEE mentor.
 
@@ -78,8 +83,7 @@ Explain:
 Make it easy but exam-oriented.
 """
 
-    elif mode == "2":
-
+    if mode == "2":
         return f"""
 Subject: {subject}
 Topic: {topic}
@@ -95,8 +99,7 @@ Give:
 Use Hinglish.
 """
 
-    elif mode == "3":
-
+    if mode == "3":
         return f"""
 Subject: {subject}
 Topic: {topic}
@@ -111,8 +114,7 @@ Generate:
 Use Hinglish.
 """
 
-    else:
-
+    if mode == "4":
         return f"""
 Subject: {subject}
 Topic: {topic}
@@ -127,44 +129,38 @@ Give a quick revision sheet including:
 Use Hinglish.
 """
 
+    raise ValueError("Mode must be one of 1, 2, 3, or 4.")
+
 
 # -----------------------------
 # AI Response
 # -----------------------------
 def generate_response(prompt):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not found. Add it to your .env file and try again.")
 
     try:
-
+        client = Groq(api_key=api_key)
         response = client.chat.completions.create(
             model="llama3-8b-8192",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
+            messages=[{"role": "user", "content": prompt}],
         )
-
-        return response.choices[0].message.content
-
-    except Exception as e:
-
-        return f"❌ Error: {e}"
+        answer = response.choices[0].message.content
+        if not answer:
+            raise RuntimeError("The API returned an empty response.")
+        return answer
+    except Exception as error:
+        raise RuntimeError("Could not generate notes. Check your API key and network, then try again.") from error
 
 
 # -----------------------------
 # Save Notes
 # -----------------------------
 def save_notes(content):
-
     os.makedirs("generated_notes", exist_ok=True)
 
-    with open(
-        "generated_notes/jee_notes.txt",
-        "w",
-        encoding="utf-8"
-    ) as file:
-
+    with open("generated_notes/jee_notes.txt", "w", encoding="utf-8") as file:
         file.write(content)
 
     print()
@@ -176,22 +172,20 @@ def save_notes(content):
 # Main Program
 # -----------------------------
 def main():
-
     banner()
 
     subject, topic, mode = get_user_input()
+    prompt = build_prompt(subject, topic, mode)
 
     print()
     print("⚡ Generating Response...")
     print()
 
-    prompt = build_prompt(
-        subject,
-        topic,
-        mode
-    )
-
-    answer = generate_response(prompt)
+    try:
+        answer = generate_response(prompt)
+    except RuntimeError as error:
+        print(f"❌ {error}")
+        return
 
     print("=" * 60)
     print(answer)
